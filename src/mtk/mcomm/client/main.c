@@ -8,15 +8,28 @@
 #include <unistd.h>
 #include <errno.h>
 #include <arpa/inet.h> 
+#include <string.h>
+#include <pthread.h>
 
 #include "tui.h"
 
 int main(int argc, char *argv[])
 {
-//  tui_init();
-//  wgetch(win_input);
-//  tui_free();
+  tui_init();
+  
+  char buf[1024];
+  memset(buf, 0, sizeof(buf));
 
+  while (strcmp(buf, "exit") != 0) {
+    wgetstr(win_input, buf);
+    wprintw(win_convers, "USER: %s\n", buf);
+    wrefresh(win_convers);
+    wclear(win_input);
+  }
+  
+  tui_free();
+
+  /*
     int sockfd = 0, n = 0;
     char recvBuff[1024];
     struct sockaddr_in serv_addr; 
@@ -64,6 +77,6 @@ int main(int argc, char *argv[])
     {
         printf("\n Read error \n");
     } 
-
-    return 0;
+  */
+  return 0;
 }

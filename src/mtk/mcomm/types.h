@@ -6,8 +6,4 @@ typedef enum {
   true = (1 == 1)
 } bool;
 
-typedef struct {
-  char value[32];
-} name_t;
-
 #endif
