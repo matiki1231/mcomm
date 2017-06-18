@@ -1,10 +1,16 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
-#include <types.h>
+#include "types.h"
 
-#define VEC_INIT(vec, elem_t) (vec_init((vec), sizeof(elem_t)))
-#define VEC_ADD(vec, elem) (vec_add((vec), &(elem)))
+#include <stdlib.h>
+
+#define VECTOR_INIT_CAPACITY 10
+#define VECTOR_RESIZE_TRESHOLD 5
+#define VECTOR_RESIZE_EXCESS 3
+
+//#define VEC_INIT(vec, elem_t) (vec_init((vec), sizeof(elem_t)))
+//#define VEC_ADD(vec, elem) (vec_add((vec), &(elem)))
 
 typedef struct {
   size_t capacity;
@@ -13,11 +19,14 @@ typedef struct {
   char* data;
 } vector_t;
 
-int vec_init(vector_t* vector, size_t elem_size);
-int vec_resize(vector_t* vector, size_t capacity);
-int vec_add(vector_t* vector, void* elem);
+bool vec_init(vector_t* vector, size_t elem_size);
+bool vec_resize(vector_t* vector, size_t capacity);
+bool vec_add(vector_t* vector, const void* elem);
 void* vec_get(vector_t* vector, int index);
-int vec_clear(vector_t* vector);
 void vec_free(vector_t* vector);
+
+inline bool vec_clear(vector_t* vector) {
+  return vec_resize(vector, 0);
+}
 
 #endif

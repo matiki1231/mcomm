@@ -6,6 +6,6 @@ typedef enum {
   true = (1 == 1)
 } bool;
 
-typedef char[32] name_t;
+typedef char name_t[32];
 
 #endif

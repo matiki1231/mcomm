@@ -9,8 +9,14 @@
 #include <errno.h>
 #include <arpa/inet.h> 
 
+#include "tui.h"
+
 int main(int argc, char *argv[])
 {
+  tui_init();
+  wgetch(win_input);
+  tui_free();
+
     int sockfd = 0, n = 0;
     char recvBuff[1024];
     struct sockaddr_in serv_addr; 
