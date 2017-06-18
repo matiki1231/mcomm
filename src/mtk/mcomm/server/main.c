@@ -12,6 +12,9 @@
 
 #include "../types.h"
 #include "../vector.h"
+#include "../protocol.h"
+
+#include "log.h"
 
 static bool running;
 static int listenfd;
@@ -30,10 +33,18 @@ void* thread_connect(void* arg) {
   int connfd = *(int*) arg;
 
   time_t ticks = time(NULL);
-  char sendBuff[1024];
+  packet_t packet;
 
-  snprintf(sendBuff, sizeof(sendBuff), "%.24s\r\n", ctime(&ticks));
-  write(connfd, sendBuff, strlen(sendBuff)); 
+  packet.type = RESPONSE_MESSAGE;
+  respmessage_t* msg = &packet.data.respmessage;
+
+  sprintf(msg->author.value, "Server");
+  sprintf(msg->message, "%.24s", ctime(&ticks));
+  write(connfd, &packet, sizeof(packet_t)); 
+
+  printf("Connected: %s\n", msg->message);
+
+  sleep(5);
 
   close(connfd);
 
@@ -54,14 +65,36 @@ void* thread_listen(void* arg) {
 
   listen(listenfd, 10); 
 
+  logger("Server started on port: %d", port);
+
   while(running)
   {
     int connfd = accept(listenfd, (struct sockaddr*)NULL, NULL); 
 
-    create_detached(&thread_connect, (void*) &connfd);
+    if (connfd > 0)
+      create_detached(&thread_connect, (void*) &connfd);
   }
 
   pthread_exit(NULL);
+}
+
+void loop_command() {
+  char* command = NULL;
+  size_t len = 0;
+
+  while (running) {
+    int n = getline(&command, &len, stdin);
+
+    command[n - 1] = '\0';
+
+    if (strcmp(command, "exit") == 0) {
+      logger("Shutting down the server...");
+      running = false;
+    }
+
+    free(command);
+    command = NULL;
+  }
 }
 
 int main(int argc, char *argv[])
@@ -79,20 +112,19 @@ int main(int argc, char *argv[])
     exit(1);
   }
 
+  logger("Starting server...");
+
   running = true;
 
   pthread_t listener;
   pthread_create(&listener, NULL, &thread_listen, (void*) &port);
 
-  // ...
-  getc(stdin);
+  loop_command(); 
 
-  running = false;
   shutdown(listenfd, SHUT_RDWR);
   close(listenfd);
 
   pthread_join(listener, NULL);
 
   pthread_exit(NULL);
-  // return 0;
 }

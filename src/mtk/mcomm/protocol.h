@@ -17,7 +17,7 @@ typedef enum {
   REPONSE_NAMES,
   REQUEST_MESSAGE,
   RESPONSE_MESSAGE
-} messagetype_t
+} packettype_t;
 
 typedef struct {
   char pass[PASSWORD_LENGTH];
@@ -37,13 +37,13 @@ typedef struct {
 } respmessage_t;
 
 typedef struct {
-  messagetype_t type;
+  packettype_t type;
   union {
     resppass_t resppass;
     respname_t respname;
     reqmessage_t reqmessage;
     respmessage_t respmessage;
-  } message;
-} message_t;
+  } data;
+} packet_t;
 
 #endif
