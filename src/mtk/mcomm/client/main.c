@@ -13,9 +13,9 @@
 
 int main(int argc, char *argv[])
 {
-  tui_init();
-  wgetch(win_input);
-  tui_free();
+//  tui_init();
+//  wgetch(win_input);
+//  tui_free();
 
     int sockfd = 0, n = 0;
     char recvBuff[1024];
