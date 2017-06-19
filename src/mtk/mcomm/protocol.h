@@ -32,8 +32,8 @@ typedef struct {
 } reqmessage_t;
 
 typedef struct {
-  name_t author;
   char message[MESSAGE_LENGTH];
+  name_t author;
 } respmessage_t;
 
 typedef struct {

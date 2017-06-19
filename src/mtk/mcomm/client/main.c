@@ -26,9 +26,11 @@ void* thread_receive(void* arg) {
     if (packet.type == RESPONSE_MESSAGE) {
       respmessage_t* msg = &packet.data.respmessage;
 
+      tui_lock();
       wprintw(win_convers, "%s: ", msg->author.value);
       wprintw(win_convers, "%s\n", msg->message);
       wrefresh(win_convers);
+      tui_unlock();
     } 
   }
 
@@ -36,24 +38,55 @@ void* thread_receive(void* arg) {
 }
 
 void loop_send(int sockfd) {
+  int chars_count = 0;
   packet_t packet;
   memset(&packet, 0, sizeof(packet_t)); 
+  reqmessage_t* msg = &packet.data.reqmessage;
 
   while (true) {
-    reqmessage_t* msg = &packet.data.reqmessage;
+    tui_lock();
 
-    wgetstr(win_input, msg->message);
-    wclear(win_input);
+    int c = wgetch(win_input);
 
-    if (strcmp(msg->message, "/exit") == 0)
-      return;
+    tui_unlock();
 
-    packet.type = REQUEST_MESSAGE;
+    if (c != ERR) {
+      if (c == 10) {
+        msg->message[chars_count] = '\0';
+        chars_count = 0;
+        tui_lock();
+        wclear(win_input);
+        tui_unlock();
 
-    if (write(sockfd, &packet, sizeof(packet_t)) < 0)
-      return;
+        if (strcmp(msg->message, "/exit") == 0)
+          return;
 
+        packet.type = REQUEST_MESSAGE;
+
+        if (write(sockfd, &packet, sizeof(packet_t)) < 0)
+          return;
+      } else {
+        msg->message[chars_count++] = (char) c;
+      }
+    }
   } 
+}
+
+bool authorize(int sockfd) {
+  packet_t packet;
+  
+  read_exact(sockfd, (char*) &packet, sizeof(packet));
+
+  if (packet.type != REQUEST_NAME)
+    return false;
+
+  printf("Enter username:\n");
+  scanf("%s", packet.data.respname.name.value);
+
+  packet.type = RESPONSE_NAME;
+  write(sockfd, (char*) &packet, sizeof(packet));
+
+  return true;
 }
 
 int main(int argc, char *argv[]) {
@@ -83,21 +116,25 @@ int main(int argc, char *argv[]) {
   {
     printf("\n Error : Connect Failed \n");
     return 1;
-  } 
+  }
 
-  tui_init();
+   
+  if (authorize(sockfd)) {
+    tui_init();
   
-  pthread_t receive;
+    pthread_t receive;
 
-  pthread_create(&receive, NULL, &thread_receive, &sockfd);
+    pthread_create(&receive, NULL, &thread_receive, &sockfd);
 
-  loop_send(sockfd);
+    loop_send(sockfd);
 
-  pthread_join(receive, NULL);
+    shutdown(sockfd, SHUT_RDWR);
+    close(sockfd);
 
-  tui_free();
+    pthread_join(receive, NULL);
 
-  close(sockfd);
+    tui_free();
+  }
 
   return 0;
 }

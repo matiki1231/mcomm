@@ -1,7 +1,11 @@
 #include "tui.h"
 
+#include <pthread.h>
+
 #define CONT_W 20
 #define INPUT_H 5
+
+pthread_mutex_t tui_mutex;
 
 WINDOW* win_input;
 WINDOW* win_convers;
@@ -35,13 +39,24 @@ static inline void _free_windows() {
 
 void tui_init() {
   initscr();
-//  cbreak();
+  cbreak();
 //  noecho();
   _draw_borders();
   _init_windows();
+  nodelay(win_input, TRUE);
+  pthread_mutex_init(&tui_mutex, NULL);
 }
 
 void tui_free() {
+  pthread_mutex_destroy(&tui_mutex);
   _free_windows();
   endwin();
+}
+
+void tui_lock() {
+  pthread_mutex_lock(&tui_mutex);
+}
+
+void tui_unlock() {
+  pthread_mutex_unlock(&tui_mutex);
 }

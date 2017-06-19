@@ -11,4 +11,8 @@ void tui_init();
 
 void tui_free();
 
+void tui_lock();
+
+void tui_unlock();
+
 #endif

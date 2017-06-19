@@ -23,9 +23,11 @@ bool vec_init(vector_t* vector, size_t elem_size);
 bool vec_resize(vector_t* vector, size_t capacity);
 bool vec_add(vector_t* vector, const void* elem);
 void* vec_get(vector_t* vector, int index);
+int vec_find(vector_t* vector, const void* elem);
+bool vec_remove(vector_t* vector, int index);
 void vec_free(vector_t* vector);
 
-inline bool vec_clear(vector_t* vector) {
+static inline bool vec_clear(vector_t* vector) {
   return vec_resize(vector, 0);
 }
 

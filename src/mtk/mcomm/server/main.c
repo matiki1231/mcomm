@@ -11,13 +11,21 @@
 #include <pthread.h>
 
 #include "../types.h"
-#include "../vector.h"
+#include "../concurr_vector.h"
 #include "../protocol.h"
+#include "../net.h"
 
 #include "log.h"
 
+typedef struct {
+  name_t name;
+  int fd;
+} connection_t;
+
 static bool running;
 static int listenfd;
+static char* password;
+static cvector_t users;
 
 void create_detached(void* (*entrypoint)(void*), void* arg) {
   pthread_t thread;
@@ -29,24 +37,62 @@ void create_detached(void* (*entrypoint)(void*), void* arg) {
   pthread_create(&thread, &attr, entrypoint, arg); 
 }
 
-void* thread_connect(void* arg) {
-  int connfd = *(int*) arg;
+void send_packet(void* conn, void* packet) {
+  connection_t* connection = (connection_t*) conn;
 
-  time_t ticks = time(NULL);
+  write(connection->fd, packet, sizeof(packet_t));
+}
+
+void broadcast(packet_t* packet) {
+  cvec_foreach(&users, &send_packet, packet);
+}
+
+void* thread_receive(void* arg) {
+  connection_t conn;
   packet_t packet;
+  
+  conn.fd = *(int*) arg;
 
-  packet.type = RESPONSE_MESSAGE;
-  respmessage_t* msg = &packet.data.respmessage;
+  if (password != NULL) {
+    packet.type = REQUEST_PASSWORD;
+    write(conn.fd, &packet, sizeof(packet_t));
 
-  sprintf(msg->author.value, "Server");
-  sprintf(msg->message, "%.24s", ctime(&ticks));
-  write(connfd, &packet, sizeof(packet_t)); 
+    if (packet.type != RESPONSE_PASSWORD)
+      pthread_exit(NULL);
 
-  printf("Connected: %s\n", msg->message);
+    read_exact(conn.fd, (char*) &packet, sizeof(packet_t));
+    
+    if (strcmp(packet.data.resppass.pass, password) != 0)
+      pthread_exit(NULL);
+  }
 
-  sleep(5);
+  packet.type = REQUEST_NAME;
+  write(conn.fd, &packet, sizeof(packet_t));
+  read_exact(conn.fd, (char*) &packet, sizeof(packet_t));
 
-  close(connfd);
+  if (packet.type != RESPONSE_NAME)
+    pthread_exit(NULL);
+
+  conn.name = packet.data.respname.name;
+  cvec_add(&users, &conn);
+
+  logger("%s connected successfuly", conn.name.value);
+
+  while (running && read_exact(conn.fd, (char*) &packet, sizeof(packet_t)) > 0) {
+    if (packet.type == REQUEST_MESSAGE) {
+      logger("%s: %s", conn.name.value, packet.data.reqmessage.message);
+
+      packet.type = RESPONSE_MESSAGE;
+      packet.data.respmessage.author = conn.name;
+
+      broadcast(&packet);
+    }
+  }
+
+  cvec_fremove(&users, &conn);
+  close(conn.fd);
+
+  logger("%s disconnected", conn.name.value);
 
   pthread_exit(NULL);
 }
@@ -72,10 +118,14 @@ void* thread_listen(void* arg) {
     int connfd = accept(listenfd, (struct sockaddr*)NULL, NULL); 
 
     if (connfd > 0)
-      create_detached(&thread_connect, (void*) &connfd);
+      create_detached(&thread_receive, (void*) &connfd);
   }
 
   pthread_exit(NULL);
+}
+
+void log_user(void* conn, void* capture) {
+  logger("  %s", ((connection_t*) conn)->name.value);
 }
 
 void loop_command() {
@@ -90,6 +140,9 @@ void loop_command() {
     if (strcmp(command, "exit") == 0) {
       logger("Shutting down the server...");
       running = false;
+    } else if (strcmp(command, "list") == 0) {
+      logger("Currently online: ");
+      cvec_foreach(&users, &log_user, NULL);
     }
 
     free(command);
@@ -100,21 +153,23 @@ void loop_command() {
 int main(int argc, char *argv[])
 {
   int port = 5000;
-  char* pass = NULL;
+  password = NULL;
 
   if (argc == 3) {
-    sscanf(argv[2], "%d", &port);
-    pass = argv[1];
+    sscanf(argv[1], "%d", &port);
+    password = argv[2];
   } else if (argc == 2) { 
-    pass = argv[1];
+    sscanf(argv[1], "%d", &port);
   } else if (argc != 1) {
-    printf("Usage: %s [pass] [port]\n", argv[0]);
+    printf("Usage: %s [port] [password]\n", argv[0]);
     exit(1);
   }
 
   logger("Starting server...");
 
   running = true;
+
+  cvec_init(&users, sizeof(connection_t));
 
   pthread_t listener;
   pthread_create(&listener, NULL, &thread_listen, (void*) &port);
@@ -123,6 +178,8 @@ int main(int argc, char *argv[])
 
   shutdown(listenfd, SHUT_RDWR);
   close(listenfd);
+
+  cvec_free(&users);
 
   pthread_join(listener, NULL);
 
