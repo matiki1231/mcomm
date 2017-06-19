@@ -75,7 +75,18 @@ void loop_send(int sockfd) {
 bool authorize(int sockfd) {
   packet_t packet;
   
-  read_exact(sockfd, (char*) &packet, sizeof(packet));
+  read_exact(sockfd, (char*) &packet, sizeof(packet_t));
+
+  if (packet.type == REQUEST_PASSWORD) {
+    char* pass = getpass("Enter password: ");
+
+    packet.type = RESPONSE_PASSWORD;
+    strcpy(packet.data.resppass.pass, pass);
+    write(sockfd, (char*) &packet, sizeof(packet_t));
+
+    if (read_exact(sockfd, (char*) &packet, sizeof(packet_t)) <= 0)
+      return false;
+  }
 
   if (packet.type != REQUEST_NAME)
     return false;
@@ -84,7 +95,7 @@ bool authorize(int sockfd) {
   scanf("%s", packet.data.respname.name.value);
 
   packet.type = RESPONSE_NAME;
-  write(sockfd, (char*) &packet, sizeof(packet));
+  write(sockfd, (char*) &packet, sizeof(packet_t));
 
   return true;
 }

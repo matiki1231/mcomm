@@ -56,22 +56,28 @@ void* thread_receive(void* arg) {
   if (password != NULL) {
     packet.type = REQUEST_PASSWORD;
     write(conn.fd, &packet, sizeof(packet_t));
-
-    if (packet.type != RESPONSE_PASSWORD)
-      pthread_exit(NULL);
-
-    read_exact(conn.fd, (char*) &packet, sizeof(packet_t));
     
-    if (strcmp(packet.data.resppass.pass, password) != 0)
+    read_exact(conn.fd, (char*) &packet, sizeof(packet_t));    
+
+    if (packet.type != RESPONSE_PASSWORD) {
+      close(conn.fd);
       pthread_exit(NULL);
+    }
+
+    if (strcmp(packet.data.resppass.pass, password) != 0) {
+      close(conn.fd);
+      pthread_exit(NULL);
+    }
   }
 
   packet.type = REQUEST_NAME;
   write(conn.fd, &packet, sizeof(packet_t));
   read_exact(conn.fd, (char*) &packet, sizeof(packet_t));
 
-  if (packet.type != RESPONSE_NAME)
+  if (packet.type != RESPONSE_NAME) {
+    close(conn.fd);
     pthread_exit(NULL);
+  }
 
   conn.name = packet.data.respname.name;
   cvec_add(&users, &conn);
